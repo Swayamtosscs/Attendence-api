@@ -87,3 +87,8 @@ Write-Host "Next steps:" -ForegroundColor Green
 Write-Host "1. Restart your dev server (npm run dev)" -ForegroundColor White
 Write-Host "2. Try registering a user again" -ForegroundColor White
 
+
+
+
+
+

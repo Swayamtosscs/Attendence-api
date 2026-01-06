@@ -18,25 +18,41 @@ export async function POST(request: NextRequest) {
 
     await connectDB();
 
+    const isAdminOrManager =
+      sessionUser.role === "admin" || sessionUser.role === "manager";
+
+    const now = new Date();
+
     const workLocation = await WorkLocationModel.create({
       name: parsed.name,
       latitude: parsed.latitude,
       longitude: parsed.longitude,
       radius: parsed.radius,
       createdBy: sessionUser.id,
-      isActive: true
+      // Employees create a pending location request which must be approved.
+      // Admins/managers create an immediately approved & active location.
+      isActive: isAdminOrManager,
+      status: isAdminOrManager ? "approved" : "pending",
+      approvedBy: isAdminOrManager ? sessionUser.id : undefined,
+      approvedAt: isAdminOrManager ? now : undefined
     });
+
+    const baseMessage = isAdminOrManager
+      ? "Location saved and approved successfully"
+      : "Location request submitted successfully, awaiting admin approval";
 
     return jsonResponse(
       {
         success: true,
-        message: "Location saved successfully",
+        message: baseMessage,
         data: {
           id: workLocation._id.toString(),
           name: workLocation.name,
           latitude: workLocation.latitude,
           longitude: workLocation.longitude,
           radius: workLocation.radius,
+          status: workLocation.status,
+          isActive: workLocation.isActive,
           createdAt: workLocation.createdAt,
           updatedAt: workLocation.updatedAt
         }
@@ -76,14 +92,21 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const includeInactive = searchParams.get("includeInactive") === "true";
+    const statusFilter = searchParams.get("status"); // pending | approved | rejected
 
     const filter: Record<string, unknown> = {};
-    if (!includeInactive) {
+
+    if (statusFilter) {
+      filter.status = statusFilter;
+    } else if (!includeInactive) {
+      // Default behaviour: only active & approved locations
       filter.isActive = true;
+      filter.status = "approved";
     }
 
     const workLocations = await WorkLocationModel.find(filter)
       .populate("createdBy", "name email")
+      .populate("approvedBy", "name email")
       .sort({ createdAt: -1 })
       .lean();
 
@@ -104,6 +127,14 @@ export async function GET(request: NextRequest) {
                 email: (loc.createdBy as any).email
               }
             : undefined,
+          approvedBy: loc.approvedBy
+            ? {
+                id: (loc.approvedBy as any)._id?.toString(),
+                name: (loc.approvedBy as any).name,
+                email: (loc.approvedBy as any).email
+              }
+            : undefined,
+          status: loc.status,
           isActive: loc.isActive,
           createdAt: loc.createdAt,
           updatedAt: loc.updatedAt

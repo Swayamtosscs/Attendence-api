@@ -69,3 +69,8 @@ try {
     Write-Host "3. Try registering first with different email" -ForegroundColor Yellow
 }
 
+
+
+
+
+

@@ -8,6 +8,9 @@ export interface WorkLocationDocument {
   radius: number;
   createdBy?: Schema.Types.ObjectId;
   isActive: boolean;
+  status: "pending" | "approved" | "rejected";
+  approvedBy?: Schema.Types.ObjectId;
+  approvedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -47,6 +50,19 @@ const workLocationSchema = new Schema<WorkLocationDocument>(
       type: Boolean,
       default: true,
       index: true
+    },
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+      index: true
+    },
+    approvedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User"
+    },
+    approvedAt: {
+      type: Date
     }
   },
   { timestamps: true }
@@ -55,10 +71,16 @@ const workLocationSchema = new Schema<WorkLocationDocument>(
 // Compound index for location queries
 workLocationSchema.index({ latitude: 1, longitude: 1 });
 workLocationSchema.index({ isActive: 1, name: 1 });
+workLocationSchema.index({ status: 1, createdAt: -1 });
 
 const WorkLocationModel =
   models.WorkLocation ||
   model<WorkLocationDocument>("WorkLocation", workLocationSchema);
 
 export default WorkLocationModel;
+
+
+
+
+
 
