@@ -26,7 +26,8 @@ export async function GET(
       return errorResponse("Unauthorized", { status: 401 });
     }
 
-    assertRole(sessionUser, ["admin"]);
+    // Allow both admin and manager to view suggestion details
+    assertRole(sessionUser, ["admin", "manager"]);
 
     const suggestionId = ensureObjectId(params.id);
 
@@ -76,9 +77,6 @@ export async function GET(
     if (error instanceof Error && error.message === "Invalid suggestion id") {
       return errorResponse("Invalid suggestion id", { status: 400 });
     }
-    if (error instanceof Error && error.message === "Forbidden") {
-      return errorResponse("Forbidden", { status: 403 });
-    }
     return handleApiError("work-location-suggestions/get", error);
   }
 }
@@ -93,7 +91,8 @@ export async function PATCH(
       return errorResponse("Unauthorized", { status: 401 });
     }
 
-    assertRole(sessionUser, ["admin"]);
+    // Allow both admin and manager to approve/reject
+    assertRole(sessionUser, ["admin", "manager"]);
 
     const suggestionId = ensureObjectId(params.id);
     const body = await request.json();
@@ -183,9 +182,6 @@ export async function PATCH(
         }
         return errorResponse(errorMessage, { status: 400 });
       }
-    }
-    if (error instanceof Error && error.message === "Forbidden") {
-      return errorResponse("Forbidden", { status: 403 });
     }
     return handleApiError("work-location-suggestions/decision", error);
   }

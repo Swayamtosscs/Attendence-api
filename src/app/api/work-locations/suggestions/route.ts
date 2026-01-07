@@ -75,15 +75,17 @@ export async function GET(request: NextRequest) {
       return errorResponse("Unauthorized", { status: 401 });
     }
 
-    // Only admin can see all suggestions
-    assertRole(sessionUser, ["admin"]);
-
     await connectDB();
 
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get("status");
 
     const filter: Record<string, unknown> = {};
+    // Admin/manager can see all, employee only sees own suggestions
+    if (sessionUser.role === "employee") {
+      filter.createdBy = sessionUser.id;
+    }
+
     if (status === "pending" || status === "approved" || status === "rejected") {
       filter.status = status;
     }
@@ -128,9 +130,6 @@ export async function GET(request: NextRequest) {
       })
     });
   } catch (error) {
-    if (error instanceof Error && error.message === "Forbidden") {
-      return errorResponse("Forbidden", { status: 403 });
-    }
     return handleApiError("work-location-suggestions/list", error);
   }
 }
