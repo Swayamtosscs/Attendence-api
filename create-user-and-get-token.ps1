@@ -94,8 +94,3 @@ try {
     Write-Host "3. Server is accessible at http://localhost:3000" -ForegroundColor White
 }
 
-
-
-
-
-

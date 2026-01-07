@@ -216,8 +216,3 @@ curl -X DELETE http://localhost:3000/api/work-locations/LOCATION_ID \
 
 **Note:** The 401 error is **correct behavior** when no token is provided. The API requires authentication for security.
 
-
-
-
-
-

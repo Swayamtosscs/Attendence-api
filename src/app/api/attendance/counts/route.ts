@@ -35,40 +35,27 @@ export async function GET(request: NextRequest) {
     const dateParam = searchParams.get("date");
     const startDate = parseDate(searchParams.get("startDate"));
     const endDate = parseDate(searchParams.get("endDate"));
-  const lastDaysParam = searchParams.get("lastDays");
 
-  // Determine date range
-  let dateFilter: { $gte: Date; $lt: Date } | undefined;
-  if (dateParam) {
-    // Single specific date has highest priority
-    const date = parseDate(dateParam);
-    if (date) {
-      const range = getDayRange(date);
+    // Determine date range
+    let dateFilter: { $gte: Date; $lt: Date } | undefined;
+    if (dateParam) {
+      const date = parseDate(dateParam);
+      if (date) {
+        const range = getDayRange(date);
+        dateFilter = { $gte: range.start, $lt: range.end };
+      }
+    } else if (startDate || endDate) {
+      const start = startDate ? getDayRange(startDate).start : new Date(0);
+      const end = endDate
+        ? getDayRange(endDate).end
+        : new Date(start.getTime() + 365 * 24 * 60 * 60 * 1000);
+      dateFilter = { $gte: start, $lt: end };
+    } else {
+      // Default to today
+      const today = new Date();
+      const range = getDayRange(today);
       dateFilter = { $gte: range.start, $lt: range.end };
     }
-  } else if (startDate || endDate) {
-    // Explicit start/end range
-    const start = startDate ? getDayRange(startDate).start : new Date(0);
-    const end = endDate
-      ? getDayRange(endDate).end
-      : new Date(start.getTime() + 365 * 24 * 60 * 60 * 1000);
-    dateFilter = { $gte: start, $lt: end };
-  } else if (lastDaysParam) {
-    // Last N days (including today)
-    const days = parseInt(lastDaysParam, 10);
-    const safeDays = Number.isNaN(days) || days <= 0 ? 1 : Math.min(days, 90);
-    const today = new Date();
-    const { start: todayStart } = getDayRange(today);
-    const start = new Date(todayStart);
-    start.setDate(start.getDate() - (safeDays - 1));
-    const end = getDayRange(today).end;
-    dateFilter = { $gte: start, $lt: end };
-  } else {
-    // Default to today
-    const today = new Date();
-    const range = getDayRange(today);
-    dateFilter = { $gte: range.start, $lt: range.end };
-  }
 
     // Build user filter
     let allowedUserIds: mongoose.Types.ObjectId[] = [];

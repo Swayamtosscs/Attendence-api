@@ -284,8 +284,3 @@ curl -X GET "http://103.14.120.163/api/attendance" \
 
 **For detailed documentation, see `API_DOCUMENTATION.md`**
 
-
-
-
-
-
