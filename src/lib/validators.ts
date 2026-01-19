@@ -100,17 +100,42 @@ export const workLocationUpdateSchema = z.object({
   isActive: z.boolean().optional()
 });
 
-export const workLocationSuggestionCreateSchema = z.object({
-  name: z.string().min(1).max(200),
-  latitude: z.number().min(-90).max(90),
-  longitude: z.number().min(-180).max(180),
-  radius: z.number().min(1).max(10000),
-  notes: z.string().min(1).max(1000).optional()
+export const salarySlipCreateSchema = z.object({
+  userId: z.string(),
+  month: z.number().int().min(1).max(12),
+  year: z.number().int().min(2000).max(2100),
+  basicSalary: z.number().min(0),
+  earnings: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(100),
+        amount: z.number().min(0)
+      })
+    )
+    .optional()
+    .default([]),
+  deductions: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(100),
+        amount: z.number().min(0)
+      })
+    )
+    .optional()
+    .default([]),
+  notes: z.string().max(1000).optional()
 });
 
-export const workLocationSuggestionDecisionSchema = z.object({
-  status: z.enum(["approved", "rejected"]),
-  reason: z.string().min(1).max(1000).optional()
+export const salarySlipQuerySchema = z.object({
+  userId: z.string().optional(),
+  month: z
+    .string()
+    .optional()
+    .transform((val) => (val ? parseInt(val, 10) : undefined)),
+  year: z
+    .string()
+    .optional()
+    .transform((val) => (val ? parseInt(val, 10) : undefined))
 });
 
 
