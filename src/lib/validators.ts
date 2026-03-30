@@ -101,6 +101,32 @@ export const workLocationUpdateSchema = z.object({
   isActive: z.boolean().optional()
 });
 
+export const holidayCreateSchema = z.object({
+  // Accept ISO date or datetime; backend will normalize to start-of-day UTC.
+  date: z.string().min(4),
+  name: z.string().min(1).max(200),
+  type: z.enum(["public", "company"]).optional().default("company"),
+  description: z.string().max(500).optional()
+});
+
+export const holidayUpdateSchema = z.object({
+  date: z.string().min(4).optional(),
+  name: z.string().min(1).max(200).optional(),
+  type: z.enum(["public", "company"]).optional(),
+  description: z.string().max(500).optional()
+});
+
+export const holidayQuerySchema = z.object({
+  year: z
+    .string()
+    .optional()
+    .transform((v) => (v ? Number.parseInt(v, 10) : undefined)),
+  month: z
+    .string()
+    .optional()
+    .transform((v) => (v ? Number.parseInt(v, 10) : undefined))
+});
+
 export const salarySlipCreateSchema = z.object({
   userId: z.string(),
   month: z.number().int().min(1).max(12),
