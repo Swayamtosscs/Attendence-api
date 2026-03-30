@@ -16,6 +16,10 @@ export interface UserDocument {
   lastLoginAt?: Date;
   // Stable per-install id used to enforce single-device login.
   deviceId?: string;
+  // Updated on each authenticated request from the bound device.
+  lastSeenAt?: Date;
+  // When the deviceId was (re)bound.
+  deviceIdBoundAt?: Date;
 
   // Personal Information
   phone?: string;
@@ -85,6 +89,8 @@ const userSchema = new Schema<UserDocument>(
       type: String,
       trim: true
     },
+    lastSeenAt: Date,
+    deviceIdBoundAt: Date,
 
     // Personal Information
     phone: {

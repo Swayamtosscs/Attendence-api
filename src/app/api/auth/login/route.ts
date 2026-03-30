@@ -27,16 +27,31 @@ export async function POST(request: NextRequest) {
       return errorResponse("Invalid credentials", { status: 401 });
     }
 
-    // Enforce single-device login per user.
-    // If this user is already bound to another deviceId, block login.
+    // Enforce single-device login per user with TTL (no force takeover).
+    // If already bound to another deviceId, allow new login only if previous device
+    // has been inactive for DEVICE_LOCK_TTL_HOURS (default 24h).
     if (user.deviceId && user.deviceId !== parsed.deviceId) {
-      return errorResponse("Already logged in on another device", {
-        status: 409
-      });
+      const ttlHoursRaw = process.env.DEVICE_LOCK_TTL_HOURS;
+      const ttlHours = Math.max(1, Number.parseInt(ttlHoursRaw ?? "24", 10) || 24);
+      const ttlMs = ttlHours * 60 * 60 * 1000;
+
+      const lastSeen = (user as any).lastSeenAt as Date | undefined;
+      const lastLogin = user.lastLoginAt as Date | undefined;
+      const lastActivity = lastSeen ?? lastLogin;
+
+      if (lastActivity && Date.now() - lastActivity.getTime() > ttlMs) {
+        // Expired: allow rebind to new device (e.g., app deleted without logout).
+      } else {
+        return errorResponse("Already logged in on another device", {
+          status: 409
+        });
+      }
     }
 
     user.deviceId = parsed.deviceId;
     user.lastLoginAt = new Date();
+    (user as any).lastSeenAt = new Date();
+    (user as any).deviceIdBoundAt = new Date();
     await user.save();
 
     const token = signAuthToken({

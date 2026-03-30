@@ -60,6 +60,20 @@ export async function getSessionUser(
     }
   }
 
+  // Update lastSeenAt for the bound device (best-effort, non-blocking).
+  // This powers TTL-based unlock when app is deleted without logout.
+  try {
+    const payloadDeviceId = (payload as { deviceId?: string }).deviceId;
+    if (payloadDeviceId && userDoc.deviceId && payloadDeviceId === userDoc.deviceId) {
+      await UserModel.updateOne(
+        { _id: userDoc._id },
+        { $set: { lastSeenAt: new Date() } }
+      );
+    }
+  } catch {
+    // ignore
+  }
+
   return {
     id: userDoc._id.toString(),
     email: userDoc.email,
