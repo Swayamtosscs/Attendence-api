@@ -48,6 +48,18 @@ export async function getSessionUser(
     return null;
   }
 
+  // Enforce single-device login when deviceId is set for the user.
+  // If userDoc.deviceId exists, the JWT payload must contain the same deviceId.
+  if (userDoc.deviceId) {
+    const payloadDeviceId = (payload as { deviceId?: string }).deviceId;
+    if (!payloadDeviceId || payloadDeviceId !== userDoc.deviceId) {
+      if (requireAuth) {
+        throw new Error("Unauthorized");
+      }
+      return null;
+    }
+  }
+
   return {
     id: userDoc._id.toString(),
     email: userDoc.email,

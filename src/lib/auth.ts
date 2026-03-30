@@ -17,6 +17,7 @@ export interface AuthTokenPayload {
   userId: string;
   role: string;
   email: string;
+  deviceId?: string;
 }
 
 export function hashPassword(password: string): Promise<string> {

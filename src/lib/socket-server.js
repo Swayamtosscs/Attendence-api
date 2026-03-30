@@ -45,7 +45,7 @@ function initializeSocket(server) {
     path: "/socket.io"
   });
 
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     const token =
       socket.handshake.auth.token ||
       socket.handshake.headers.authorization?.replace("Bearer ", "");
@@ -59,6 +59,16 @@ function initializeSocket(server) {
       socket.data.userId = payload.userId;
       socket.data.userRole = payload.role;
       socket.data.userEmail = payload.email;
+      socket.data.deviceId = payload.deviceId;
+
+      // Enforce single-device login when deviceId is set for the user.
+      await connectDB();
+      const UserModel = (await import("../models/User")).default;
+      const userDoc = await UserModel.findById(payload.userId).lean();
+      if (userDoc?.deviceId && (!payload.deviceId || payload.deviceId !== userDoc.deviceId)) {
+        return next(new Error("Authentication error: Device mismatch"));
+      }
+
       next();
     } catch (error) {
       next(new Error("Authentication error: Invalid token"));

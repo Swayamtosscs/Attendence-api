@@ -27,13 +27,23 @@ export async function POST(request: NextRequest) {
       return errorResponse("Invalid credentials", { status: 401 });
     }
 
+    // Enforce single-device login per user.
+    // If this user is already bound to another deviceId, block login.
+    if (user.deviceId && user.deviceId !== parsed.deviceId) {
+      return errorResponse("Already logged in on another device", {
+        status: 409
+      });
+    }
+
+    user.deviceId = parsed.deviceId;
     user.lastLoginAt = new Date();
     await user.save();
 
     const token = signAuthToken({
       userId: user._id.toString(),
       role: user.role,
-      email: user.email
+      email: user.email,
+      deviceId: parsed.deviceId
     });
 
     setAuthCookie(token);

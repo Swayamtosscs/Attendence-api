@@ -14,6 +14,8 @@ export interface UserDocument {
   manager?: Schema.Types.ObjectId;
   profilePicture?: string;
   lastLoginAt?: Date;
+  // Stable per-install id used to enforce single-device login.
+  deviceId?: string;
 
   // Personal Information
   phone?: string;
@@ -79,6 +81,10 @@ const userSchema = new Schema<UserDocument>(
       trim: true
     },
     lastLoginAt: Date,
+    deviceId: {
+      type: String,
+      trim: true
+    },
 
     // Personal Information
     phone: {

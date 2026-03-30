@@ -12,7 +12,8 @@ export const registerUserSchema = z.object({
 
 export const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6)
+  password: z.string().min(6),
+  deviceId: z.string().min(1).max(128).optional()
 });
 
 export const updateUserSchema = z.object({
