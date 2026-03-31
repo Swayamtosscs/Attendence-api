@@ -55,6 +55,49 @@ export const attendanceManualEntrySchema = z.object({
   notes: z.string().optional()
 });
 
+export const attendancePolicyUpsertSchema = z
+  .object({
+    halfDayMinutes: z.number().int().min(0),
+    fullDayMinutes: z.number().int().min(0)
+  })
+  .refine((v) => v.fullDayMinutes >= v.halfDayMinutes, {
+    message: "fullDayMinutes must be >= halfDayMinutes"
+  });
+
+export const attendanceWorkHoursQuerySchema = z.object({
+  userId: z.string().optional(),
+  date: z.string().optional(), // ISO date/datetime; normalized server-side
+  includeOpenSession: z
+    .string()
+    .optional()
+    .transform((v) => v === "true"),
+  applyPolicy: z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined ? true : v === "true"))
+});
+
+export const attendanceWorkHoursUpdateSchema = z.object({
+  userId: z.string().optional(),
+  date: z.string().optional(),
+  includeOpenSession: z.boolean().optional().default(false),
+  applyPolicy: z.boolean().optional().default(true),
+  forceOverrideStatus: z.boolean().optional().default(false)
+});
+
+export const userFullReportQuerySchema = z.object({
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  includeOpenSession: z
+    .string()
+    .optional()
+    .transform((v) => v === "true"),
+  includeEvents: z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined ? true : v === "true"))
+});
+
 export const attendanceUpdateSchema = z.object({
   date: z.string().datetime().optional(),
   checkInAt: z.string().datetime().optional(),

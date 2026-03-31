@@ -35,6 +35,10 @@ export async function GET(request: NextRequest) {
     const dateParam = searchParams.get("date");
     const startDate = parseDate(searchParams.get("startDate"));
     const endDate = parseDate(searchParams.get("endDate"));
+    const includeTimestampsParam = searchParams.get("includeTimestamps");
+    const includeTimestamps =
+      includeTimestampsParam === null ||
+      (includeTimestampsParam !== "0" && includeTimestampsParam !== "false");
 
     // Determine date range
     let dateFilter: { $gte: Date; $lt: Date } | undefined;
@@ -87,99 +91,80 @@ export async function GET(request: NextRequest) {
       match.user = { $in: allowedUserIds };
     }
 
-    // Aggregate to get counts grouped by date, user, and location
-    const results = await AttendanceEventModel.aggregate([
-      { $match: match },
-      {
-        $group: {
-          _id: {
-            date: "$date",
-            user: "$user",
-            locationKey: {
-              $cond: [
-                {
-                  $and: [
-                    { $ne: ["$location.latitude", null] },
-                    { $ne: ["$location.longitude", null] }
-                  ]
-                },
-                {
-                  $concat: [
-                    { $toString: "$location.latitude" },
-                    ",",
-                    { $toString: "$location.longitude" }
-                  ]
-                },
-                "no-location"
+    // Aggregate to get counts grouped by date, user, and location (single-pass grouping).
+    // Timestamps can be heavy; keep them optional for faster reports.
+    const groupStage: Record<string, unknown> = {
+      _id: {
+        date: "$date",
+        user: "$user",
+        locationKey: {
+          $cond: [
+            {
+              $and: [
+                { $ne: ["$location.latitude", null] },
+                { $ne: ["$location.longitude", null] }
               ]
             },
-            type: "$type"
-          },
-          count: { $sum: 1 },
-          location: { $first: "$location" },
-          timestamps: { $push: "$timestamp" }
+            {
+              $concat: [
+                { $toString: "$location.latitude" },
+                ",",
+                { $toString: "$location.longitude" }
+              ]
+            },
+            "no-location"
+          ]
         }
       },
-      {
-        $group: {
-          _id: {
-            date: "$_id.date",
-            user: "$_id.user",
-            locationKey: "$_id.locationKey"
-          },
-          location: { $first: "$location" },
-          checkIns: {
-            $sum: {
-              $cond: [{ $eq: ["$_id.type", "check-in"] }, "$count", 0]
-            }
-          },
-          checkOuts: {
-            $sum: {
-              $cond: [{ $eq: ["$_id.type", "check-out"] }, "$count", 0]
-            }
-          },
-          checkInTimestamps: {
-            $push: {
-              $cond: [
-                { $eq: ["$_id.type", "check-in"] },
-                "$timestamps",
-                []
-              ]
-            }
-          },
-          checkOutTimestamps: {
-            $push: {
-              $cond: [
-                { $eq: ["$_id.type", "check-out"] },
-                "$timestamps",
-                []
-              ]
-            }
-          }
-        }
+      location: { $first: "$location" },
+      checkIns: {
+        $sum: { $cond: [{ $eq: ["$type", "check-in"] }, 1, 0] }
       },
+      checkOuts: {
+        $sum: { $cond: [{ $eq: ["$type", "check-out"] }, 1, 0] }
+      }
+    };
+
+    if (includeTimestamps) {
+      groupStage.checkInTimestamps = {
+        $push: {
+          $cond: [{ $eq: ["$type", "check-in"] }, "$timestamp", "$$REMOVE"]
+        }
+      };
+      groupStage.checkOutTimestamps = {
+        $push: {
+          $cond: [{ $eq: ["$type", "check-out"] }, "$timestamp", "$$REMOVE"]
+        }
+      };
+    }
+
+    const results = await AttendanceEventModel.aggregate([
+      { $match: match },
+      { $group: groupStage as any },
       {
         $project: {
           _id: 0,
           date: "$_id.date",
           userId: "$_id.user",
-          location: 1,
+          location: {
+            $cond: [
+              {
+                $and: [
+                  { $ne: ["$location.latitude", null] },
+                  { $ne: ["$location.longitude", null] }
+                ]
+              },
+              "$location",
+              null
+            ]
+          },
           checkIns: 1,
           checkOuts: 1,
-          checkInTimestamps: {
-            $reduce: {
-              input: "$checkInTimestamps",
-              initialValue: [],
-              in: { $concatArrays: ["$$value", "$$this"] }
-            }
-          },
-          checkOutTimestamps: {
-            $reduce: {
-              input: "$checkOutTimestamps",
-              initialValue: [],
-              in: { $concatArrays: ["$$value", "$$this"] }
-            }
-          }
+          sessionsCompleted: { $min: ["$checkIns", "$checkOuts"] },
+          openSession: { $gt: [{ $subtract: ["$checkIns", "$checkOuts"] }, 0] },
+          ...(includeTimestamps
+            ? { checkInTimestamps: 1, checkOutTimestamps: 1 }
+            : {})
         }
       },
       {
@@ -202,8 +187,11 @@ export async function GET(request: NextRequest) {
           location: 1,
           checkIns: 1,
           checkOuts: 1,
-          checkInTimestamps: 1,
-          checkOutTimestamps: 1,
+          sessionsCompleted: 1,
+          openSession: 1,
+          ...(includeTimestamps
+            ? { checkInTimestamps: 1, checkOutTimestamps: 1 }
+            : {}),
           user: {
             id: "$user._id",
             name: "$user.name",
@@ -211,9 +199,7 @@ export async function GET(request: NextRequest) {
           }
         }
       },
-      {
-        $sort: { date: -1, "user.name": 1 }
-      }
+      { $sort: { date: -1, "user.name": 1 } }
     ]);
 
     return jsonResponse({

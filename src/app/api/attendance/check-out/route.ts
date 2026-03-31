@@ -30,18 +30,32 @@ export async function POST(request: NextRequest) {
     const now = new Date();
     const { start, end } = getDayRange(now);
 
-    // Check if there's at least one check-in today
-    const checkInCount = await AttendanceEventModel.countDocuments({
+    // Enforce alternating check-in/check-out sequence for today.
+    // Allowed checkout only if last event is a check-in.
+    const lastEvent = (await AttendanceEventModel.findOne({
       user: sessionUser.id,
-      type: "check-in",
       date: start
-    });
+    })
+      .sort({ timestamp: -1 })
+      .select("type timestamp")
+      .lean()) as { type: "check-in" | "check-out"; timestamp: Date } | null;
 
-    if (checkInCount === 0) {
+    if (!lastEvent) {
       return errorResponse("No check-in found for today", { status: 404 });
     }
 
-    // Create attendance event (allows multiple check-outs per day)
+    if (lastEvent.type !== "check-in") {
+      return jsonResponse(
+        {
+          success: false,
+          message: "Already checked out. Please check in before checking out again.",
+          data: { lastEvent }
+        },
+        { status: 409 }
+      );
+    }
+
+    // Create attendance event (multiple sessions per day allowed, but must alternate)
     const event = await AttendanceEventModel.create({
       user: sessionUser.id,
       type: "check-out",

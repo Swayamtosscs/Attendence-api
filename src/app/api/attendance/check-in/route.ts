@@ -30,13 +30,38 @@ export async function POST(request: NextRequest) {
     const now = new Date();
     const { start, end } = getDayRange(now);
 
+    // Enforce alternating check-in/check-out sequence for today.
+    // Allowed:
+    // - First event of the day can be check-in
+    // - After a check-out, next can be check-in
+    // Not allowed:
+    // - Multiple check-ins in a row without a check-out
+    const lastEvent = (await AttendanceEventModel.findOne({
+      user: sessionUser.id,
+      date: start
+    })
+      .sort({ timestamp: -1 })
+      .select("type timestamp")
+      .lean()) as { type: "check-in" | "check-out"; timestamp: Date } | null;
+
+    if (lastEvent?.type === "check-in") {
+      return jsonResponse(
+        {
+          success: false,
+          message: "Already checked in. Please check out before checking in again.",
+          data: { lastEvent }
+        },
+        { status: 409 }
+      );
+    }
+
     // Check for existing attendance (for backward compatibility)
     const existingAttendance = await AttendanceModel.findOne({
       user: sessionUser.id,
       date: { $gte: start, $lt: end }
     });
 
-    // Create attendance event (allows multiple check-ins per day)
+    // Create attendance event (multiple sessions per day allowed, but must alternate)
     const event = await AttendanceEventModel.create({
       user: sessionUser.id,
       type: "check-in",
@@ -55,6 +80,9 @@ export async function POST(request: NextRequest) {
     if (existingAttendance) {
       // Update existing attendance with latest check-in
       existingAttendance.checkInAt = now;
+      // Start a new active session for backward-compat record.
+      existingAttendance.checkOutAt = undefined;
+      existingAttendance.workDurationMinutes = undefined;
       if (parsed.notes) existingAttendance.notes = parsed.notes;
       if (parsed.deviceInfo) existingAttendance.deviceInfo = parsed.deviceInfo;
       if (parsed.latitude && parsed.longitude) {
